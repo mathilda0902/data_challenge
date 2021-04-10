@@ -25,7 +25,8 @@ def main(file_path):
                         StructField('cbd', DoubleType(), nullable=False),
                         StructField('cbda', DoubleType(), nullable=False)])
     df = spark.createDataFrame(data=rdd,schema=json_schema)
-    new_df = df.select('tested_at',date_format('tested_at', 'E').alias('tested_at_day_of_week'),'batch_id','vendor_id','product_id','lab_id','state','expires_at','thc','thca','cbd','cbda')
+    new_df = df.select('tested_at',date_format('tested_at', 'E').alias('tested_at_day_of_week'),'batch_id','vendor_id','product_id', \
+                'lab_id','state','expires_at','thc','thca','cbd','cbda')
     new_df.repartition(12).write.partitionBy("tested_at").parquet("s3a://data-challenge-lab-tests/",mode="append")
 
 
