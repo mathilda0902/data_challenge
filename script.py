@@ -1,38 +1,34 @@
 from pyspark import SparkContext
-from pyspark.sql import functions as F
-from pyspark.sql import Row
-from pyspark.sql.functions import udf, struct
-from pyspark.sql.types import ArrayType, IntegerType, StructType, StructField, StringType, DoubleType
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import date_format
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 import json
 
-def construct_json_rdd(text_file):
-    rdd = text_file.map(lambda r: json.loads(r))
-    return rdd
-
-def construct_schema():
-    schema = StructType([StructField('batch_id', StringType(), nullable=False), 
-                    StructField('vendor_id', StringType(), nullable=False),
-                    StructField('product_id', StringType(), nullable=False),
-                    StructField('lab_id', StringType(), nullable=False),
-                    StructField('state', StringType(), nullable=False),
-                    StructField('tested_at', StringType(), nullable=False),
-                    StructField('expires_at', StringType(), nullable=False),
-                    StructField('thc', DoubleType(), nullable=False),
-                    StructField('thca', DoubleType(), nullable=False),
-                    StructField('cbd', DoubleType(), nullable=False),
-                    StructField('cbda', DoubleType(), nullable=False)])
-    return schema
+def create_spark_session():
+    """Create spark session.
+    """
+    spark = SparkSession.builder.config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:2.7.0").getOrCreate()
+    return spark
 
 def main():
-    sc = SparkContext()
+    spark = create_spark_session()
+    sc = SparkContext(appName="data-challenge")
     text_file = sc.textFile('s3://emr-spark-notebook-data-challenge/file1.txt.gz')
-    data_rdd = construct_json_rdd(text_file)
-    schema = construct_schema()
-    df = sc.createDataFrame(data=data_rdd,schema=schema)
-    # n = 12 
-    # spark_df = df2.repartition(n)
-    spark_df = df.limit(1000)
-    spark_df.write.partitionBy("tested_at").parquet("s3a://data-challenge-lab-tests/",mode="append")
+    rdd = text_file.map(lambda r: json.loads(r))
+    json_schema = StructType([StructField('batch_id', StringType(), nullable=False), 
+                        StructField('vendor_id', StringType(), nullable=False),
+                        StructField('product_id', StringType(), nullable=False),
+                        StructField('lab_id', StringType(), nullable=False),
+                        StructField('state', StringType(), nullable=False),
+                        StructField('tested_at', StringType(), nullable=False),
+                        StructField('expires_at', StringType(), nullable=False),
+                        StructField('thc', DoubleType(), nullable=False),
+                        StructField('thca', DoubleType(), nullable=False),
+                        StructField('cbd', DoubleType(), nullable=False),
+                        StructField('cbda', DoubleType(), nullable=False)])
+    df = spark.createDataFrame(data=rdd,schema=json_schema)
+    new_df = df.select('tested_at',date_format('tested_at', 'E').alias('tested_at_day_of_week'),'batch_id','vendor_id','product_id','lab_id','state','expires_at','thc','thca','cbd','cbda')
+    new_df.repartition(12).write.partitionBy("tested_at").parquet("s3a://data-challenge-lab-tests/",mode="append")
 
 
 if __name__ == '__main__':
