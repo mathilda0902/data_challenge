@@ -10,10 +10,8 @@ def create_spark_session():
     spark = SparkSession.builder.config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:2.7.0").getOrCreate()
     return spark
 
-def main():
-    spark = create_spark_session()
-    sc = SparkContext(appName="data-challenge")
-    text_file = sc.textFile('s3://emr-spark-notebook-data-challenge/file1.txt.gz')
+def main(file_path):
+    text_file = sc.textFile(file_path)
     rdd = text_file.map(lambda r: json.loads(r))
     json_schema = StructType([StructField('batch_id', StringType(), nullable=False), 
                         StructField('vendor_id', StringType(), nullable=False),
@@ -32,4 +30,9 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    file_path_pattern = f's3://emr-spark-notebook-data-challenge/file{i}.txt.gz'
+    spark = create_spark_session()
+    sc = SparkContext(appName="data-challenge")
+    for i in range(8):
+        file_path = file_path_pattern
+        main(file_path)
